@@ -5,13 +5,11 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"time"
 
 	opentracing "github.com/opentracing/opentracing-go"
 	"github.com/opentracing/opentracing-go/ext"
 	jaeger "github.com/uber/jaeger-client-go"
 	jaegerConfig "github.com/uber/jaeger-client-go/config"
-	transportZipkin "github.com/uber/jaeger-client-go/transport/zipkin"
 	"github.com/uber/jaeger-client-go/zipkin"
 	"github.com/uber/jaeger-lib/metrics"
 )
@@ -34,65 +32,30 @@ func (jp *jaegerProvider) NewTracer(config *Config) error {
 	var tracer opentracing.Tracer
 	var closer io.Closer
 
-	if jp.endpoint == "" {
-		// jaeger
-		cfg, err := jaegerConfig.FromEnv()
-		if err != nil {
-			jp.logger.Error(err.Error())
-			return err
-		}
+	cfg, err := jaegerConfig.FromEnv()
+	if err != nil {
+		jp.logger.Error(err.Error())
+		return err
+	}
 
-		zipkinPropagator := zipkin.NewZipkinB3HTTPHeaderPropagator()
-		tracer, closer, err = cfg.New(
-			fmt.Sprintf("%s-%s", config.ServiceName, config.ServiceVersion),
-			jaegerConfig.Logger(jp.logger),
-			jaegerConfig.Metrics(metrics.NullFactory),
-			jaegerConfig.Injector(opentracing.HTTPHeaders, zipkinPropagator),
-			jaegerConfig.Extractor(opentracing.HTTPHeaders, zipkinPropagator),
-			jaegerConfig.ZipkinSharedRPCSpan(true),
-		)
-		if err != nil {
-			jp.logger.Error(err.Error())
-			return err
-		}
-	} else {
-		// zipkin
-		transport, err := transportZipkin.NewHTTPTransport(
-			jp.endpoint,
-			transportZipkin.HTTPBatchSize(jp.batchSize),
-			transportZipkin.HTTPTimeout(time.Second*time.Duration(jp.timeout)),
-			transportZipkin.HTTPLogger(jp.logger),
-		)
-		if err != nil {
-			jp.logger.Error(err.Error())
-			return err
-		}
-		zipkinPropagator := zipkin.NewZipkinB3HTTPHeaderPropagator()
-		injector := jaeger.TracerOptions.Injector(opentracing.HTTPHeaders, zipkinPropagator)
-		extractor := jaeger.TracerOptions.Extractor(opentracing.HTTPHeaders, zipkinPropagator)
-		zipkinSharedRPCSpan := jaeger.TracerOptions.ZipkinSharedRPCSpan(true)
-		gen128Bit := jaeger.TracerOptions.Gen128Bit(true)
-		logger := jaeger.TracerOptions.Logger(jp.logger)
-		tracer, closer = jaeger.NewTracer(
-			fmt.Sprintf("%s-%s", config.ServiceName, config.ServiceVersion),
-			jaeger.NewConstSampler(true),
-			jaeger.NewRemoteReporter(transport),
-			injector,
-			extractor,
-			zipkinSharedRPCSpan,
-			gen128Bit,
-			logger,
-		)
-		if err != nil {
-			jp.logger.Error(err.Error())
-			return err
-		}
+	zipkinPropagator := zipkin.NewZipkinB3HTTPHeaderPropagator()
+	tracer, closer, err = cfg.New(
+		fmt.Sprintf("%s-%s", config.ServiceName, config.ServiceVersion),
+		jaegerConfig.Logger(jp.logger),
+		jaegerConfig.Metrics(metrics.NullFactory),
+		jaegerConfig.Injector(opentracing.HTTPHeaders, zipkinPropagator),
+		jaegerConfig.Extractor(opentracing.HTTPHeaders, zipkinPropagator),
+		jaegerConfig.ZipkinSharedRPCSpan(true),
+	)
+	if err != nil {
+		jp.logger.Error(err.Error())
+		return err
 	}
 
 	opentracing.SetGlobalTracer(tracer)
-
 	jaegerTracer = tracer
 	jaegerCloser = closer
+
 	return nil
 }
 

@@ -49,7 +49,7 @@ func InitGlobalTracer(config *Config) error {
 		if config.Zipkin.Logger == nil {
 			config.Zipkin.Logger = jaeger.StdLogger
 		}
-		tracer = &jaegerProvider{
+		tracer = &zipkinProvider{
 			logger:    config.Zipkin.Logger,
 			endpoint:  config.Zipkin.Endpoint,
 			batchSize: config.Zipkin.BatchSize,
