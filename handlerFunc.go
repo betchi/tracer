@@ -3,8 +3,6 @@ package tracer
 import (
 	"fmt"
 	"net/http"
-
-	"github.com/swagchat/chat-api/config"
 )
 
 type customResponseWriter struct {
@@ -40,11 +38,11 @@ func HandlerFunc(fn http.HandlerFunc) http.HandlerFunc {
 		sw := &customResponseWriter{ResponseWriter: w}
 		fn(sw, r.WithContext(ctx))
 
-		userID := ctx.Value(config.CtxUserID)
+		userID := ctx.Value(CtxUserID)
 		if userID != nil {
 			globalTracer.SetTag(span, "userId", userID)
 		}
-		clientID := ctx.Value(config.CtxClientID)
+		clientID := ctx.Value(CtxClientID)
 		if clientID != nil {
 			globalTracer.SetTag(span, "clientId", clientID)
 		}
