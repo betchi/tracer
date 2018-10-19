@@ -52,3 +52,31 @@ func HandlerFunc(fn http.HandlerFunc) http.HandlerFunc {
 		globalTracer.SetTag(span, "http.referer", r.Referer())
 	}
 }
+
+// Handler starts transaction of trace
+func Handler(h http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx, span := globalTracer.StartTransaction(
+			r.Context(),
+			fmt.Sprintf("%s:%s", r.Method, r.RequestURI), "REST",
+			StartTransactionOptionWithHTTPRequest(r),
+		)
+		defer globalTracer.CloseTransaction(ctx)
+
+		sw := &customResponseWriter{ResponseWriter: w}
+		h.ServeHTTP(w, r.WithContext(ctx))
+
+		userID := ctx.Value(CtxUserID)
+		if userID != nil {
+			globalTracer.SetTag(span, "userId", userID)
+		}
+		clientID := ctx.Value(CtxClientID)
+		if clientID != nil {
+			globalTracer.SetTag(span, "clientId", clientID)
+		}
+		globalTracer.SetHTTPStatusCode(span, sw.status)
+		globalTracer.SetTag(span, "http.method", r.Method)
+		globalTracer.SetTag(span, "http.content_length", sw.length)
+		globalTracer.SetTag(span, "http.referer", r.Referer())
+	})
+}
